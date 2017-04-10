@@ -1,0 +1,127 @@
+---
+title: "Machine Learning Course Project. Human Activity Recognition"
+author: "Andrey Vlasenko"
+date: "10.04.2017"
+output: html_document
+---
+
+# Introduction
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here  <http://groupware.les.inf.puc-rio.br/har>.
+
+The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+```{r,results='hide',message=FALSE,warning=FALSE}
+rm(list=ls()) # loading libraries
+library(caret); library(randomForest); 
+library(rpart); library(rpart.plot); library(plyr)
+library(gbm); library(e1071); library(MASS)
+```
+
+# Data preprocessing
+Loading and clearing the data.
+```{r}
+training<-read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv",
+                   na.strings=c("", "NA", "NULL", "#DIV/0!")) # there are NA values in the data
+testing<-read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv",
+                   na.strings=c("", "NA", "NULL", "#DIV/0!")) # there are NA values in the data
+c(dim(training),dim(testing)) # dimensions of training and testing sets without NA vars
+table(training$classe) # there are 5 outcomes.
+NAVals <- apply(is.na(training),2,sum)/dim(training)[1] # share of NA values in data
+NAVals <- NAVals[NAVals>0.95]; NAnms<-names(NAVals); # NAnms - names of useless variables
+trnSet <- training[,!(names(training) %in% NAnms)] # removing NA variables from training
+tstSet <- testing[,!(names(training) %in% NAnms)] # removing NA variables from testing
+trnSet <- trnSet[,-c(1:7)] # we have to remove first 7 variables linked with time 
+tstSet <- tstSet[,-c(1:7)] # and number of the observations to avoid overfitting of the model
+c(dim(trnSet),dim(tstSet)) # dimensions of training and testing sets without NA vars
+str(trnSet)
+ValsOfVars<-apply(trnSet, 2, function(x)length(unique(x))) # Number of values for each variable
+length(ValsOfVars[ValsOfVars<2]) # there are no meaningless variables in data (with only 1 value)
+```
+There are `r dim(trnSet)[2]` variables (`r dim(trnSet)[2]-1` predictors) in training (`r dim(trnSet)[1]` rows) and testing (`r dim(tstSet)[1]` questions of the final test) data sets.
+
+# Modeling
+
+Slicing training data set to training and testing sets to estimate the quality (accuracy) of the models.
+
+```{r}
+set.seed(1435)
+inTrain <- createDataPartition(y=trnSet$classe, p = 0.60, list=FALSE)
+trnSet_trn <- trnSet[inTrain,] # training set
+trnSet_tst <- trnSet[-inTrain,] # testing set
+```
+
+Let's fit the models. We'll take into account the following models: 
+* random forest, 
+* decision tree, 
+* stochastic gradient boosting, 
+* linear discriminant analysis,
+* support vector machine.
+
+```{r,results='hide',message=FALSE,warning=FALSE}
+set.seed(125195)
+model_RF <- randomForest(classe ~ ., data=trnSet_trn, importance = TRUE)
+model_DT <- rpart(classe ~ ., data=trnSet_trn, method="class")
+model_gbm <- train(classe ~ ., data=trnSet_trn, method="gbm")
+model_lda <- train(classe ~ ., data=trnSet_trn, method="lda")
+model_svm <- svm(classe ~ ., data=trnSet_trn)
+```
+
+
+## Random forest model results
+
+```{r}
+prediction_RF <- predict(model_RF, trnSet_tst)
+ConMx <- confusionMatrix(prediction_RF, trnSet_tst$classe)
+print(ConMx)
+head(apply(-varImp(model_RF),2,order))
+plot(model_RF)
+```
+
+## Decision tree model results
+
+```{r}
+prediction_DT <- predict(model_DT, trnSet_tst, type="class")
+ConMx2 <- confusionMatrix(prediction_DT, trnSet_tst$classe)
+print(ConMx2)
+order(-varImp(model_DT))
+```
+## Stochastic Gradient Boosting model results
+
+```{r}
+prediction_gbm <- predict(model_gbm, trnSet_tst)
+ConMx3 <- confusionMatrix(prediction_gbm, trnSet_tst$classe)
+print(ConMx3)
+```
+## Linear Discriminant Analysis model results
+
+```{r}
+prediction_lda <- predict(model_lda, trnSet_tst)
+ConMx4 <- confusionMatrix(prediction_lda, trnSet_tst$classe)
+print(ConMx4)
+```
+## Support vector machine model results
+
+```{r}
+prediction_svm <- predict(model_svm, trnSet_tst)
+ConMx5 <- confusionMatrix(prediction_svm, trnSet_tst$classe)
+print(ConMx5)
+```
+
+# Conclusion 
+
+RF demonstrate the highest accuracy (`r round(ConMx$overall['Accuracy'],2)`). Also high accuracy was in gbm and svm models (`r round(ConMx3$overall['Accuracy'],2)` and `r round(ConMx5$overall['Accuracy'],2)`). Lowest accuracy was in lda (`r round(ConMx4$overall['Accuracy'],2)`) and rpart (`r round(ConMx2$overall['Accuracy'],2)`)
+
+
+# Final test predictions
+
+```{r}
+prediction <- rbind(predict(model_RF, tstSet),predict(model_DT, tstSet,type="class"),
+                    predict(model_gbm, tstSet),predict(model_lda, tstSet),
+                    predict(model_svm, tstSet))
+Pred_Fin <- as.data.frame(x=matrix(c("A","B","C","D","E")[prediction], ncol = 20, nrow = 5),
+                          row.names = c("RF","DT","gbm","lda","svm"))
+print(Pred_Fin)
+```
+For final quiz we'll use the results of the random forest model which demonstrate the best accuracy (`r round(ConMx$overall['Accuracy'],2)`).
