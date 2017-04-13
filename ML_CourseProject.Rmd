@@ -82,7 +82,7 @@ model_svm <- svm(classe ~ ., data=trnSet_trn)
 ```
 
 # Accuracy of the models
-To estimate out of sample error (models were built on `trnSet_trn`) we'll use _**`trnSet_tst`**_.
+To estimate out of sample error we'll use _**`trnSet_tst`**_ (models were built on `trnSet_trn`).
 
 ### Random forest model testing results
 
