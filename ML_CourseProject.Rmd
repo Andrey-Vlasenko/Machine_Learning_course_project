@@ -12,8 +12,21 @@ In this project, your goal will be to use data from accelerometers on the belt, 
 
 The goal of the project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
 
+# Summary
+In this work for classification task we take into account 5 different models:
+- random forest (rf), 
+- decision tree (rpart), 
+- stochastic gradient boosting (gbm), 
+- linear discriminant analysis (lda), 
+- support vector machine (svm).
+
+There was 2 input sets: 
+- training (pml-training.csv) which was split to train `trnSet_trn` (biulding the models) and test sets `trnSet_tst` (cross-validation).
+- testing (pml-testing.csv) which was used in final quiz. 
+
+To compare models we estimate out of sample error (accuracy). The best result demonstrate RF (0.99), GBM (0.96) and SVM (0.93) models.
+
 ```{r,results='hide',message=FALSE,warning=FALSE}
-rm(list=ls()) # loading libraries
 library(caret); library(randomForest); 
 library(rpart); library(rpart.plot); library(plyr)
 library(gbm); library(e1071); library(MASS)
@@ -43,23 +56,23 @@ There are `r dim(trnSet)[2]` variables (`r dim(trnSet)[2]-1` predictors) in trai
 
 # Modeling
 
-Slicing training data set to training and testing sets to estimate the quality (accuracy) of the models.
+Slicing training data set to training and testing sets to estimate the quality (accuracy) of the models by cross-validation.
 
 ```{r}
 set.seed(1435)
 inTrain <- createDataPartition(y=trnSet$classe, p = 0.60, list=FALSE)
-trnSet_trn <- trnSet[inTrain,] # training set
-trnSet_tst <- trnSet[-inTrain,] # testing set
+trnSet_trn <- trnSet[inTrain,] # training set (to biuld the models)
+trnSet_tst <- trnSet[-inTrain,] # testing set for cross-validation (to estimate error)
 ```
 
-Let's fit the models. We'll take into account the following models: 
+Let's fit the models (using `trnSet_trn`). We'll take into account the following models: 
 * random forest, 
 * decision tree, 
 * stochastic gradient boosting, 
 * linear discriminant analysis,
 * support vector machine.
 
-```{r,results='hide',message=FALSE,warning=FALSE}
+```{r,results='hide',message=FALSE,warning=FALSE,cache=TRUE}
 set.seed(125195)
 model_RF <- randomForest(classe ~ ., data=trnSet_trn, importance = TRUE)
 model_DT <- rpart(classe ~ ., data=trnSet_trn, method="class")
@@ -68,8 +81,10 @@ model_lda <- train(classe ~ ., data=trnSet_trn, method="lda")
 model_svm <- svm(classe ~ ., data=trnSet_trn)
 ```
 
+# Accuracy of the models
+To estimate out of sample error (models were built on `trnSet_trn`) we'll use `trnSet_tst`.
 
-## Random forest model results
+### Random forest model testing results
 
 ```{r}
 prediction_RF <- predict(model_RF, trnSet_tst)
@@ -79,7 +94,7 @@ head(apply(-varImp(model_RF),2,order))
 plot(model_RF)
 ```
 
-## Decision tree model results
+### Decision tree model testing results
 
 ```{r}
 prediction_DT <- predict(model_DT, trnSet_tst, type="class")
@@ -87,21 +102,21 @@ ConMx2 <- confusionMatrix(prediction_DT, trnSet_tst$classe)
 print(ConMx2)
 order(-varImp(model_DT))
 ```
-## Stochastic Gradient Boosting model results
+### Stochastic Gradient Boosting model testing results
 
 ```{r}
 prediction_gbm <- predict(model_gbm, trnSet_tst)
 ConMx3 <- confusionMatrix(prediction_gbm, trnSet_tst$classe)
 print(ConMx3)
 ```
-## Linear Discriminant Analysis model results
+### Linear Discriminant Analysis model testing results
 
 ```{r}
 prediction_lda <- predict(model_lda, trnSet_tst)
 ConMx4 <- confusionMatrix(prediction_lda, trnSet_tst$classe)
 print(ConMx4)
 ```
-## Support vector machine model results
+### Support vector machine model testing results
 
 ```{r}
 prediction_svm <- predict(model_svm, trnSet_tst)
@@ -109,9 +124,8 @@ ConMx5 <- confusionMatrix(prediction_svm, trnSet_tst$classe)
 print(ConMx5)
 ```
 
-# Conclusion 
-
-RF demonstrate the highest accuracy (`r round(ConMx$overall['Accuracy'],2)`). Also high accuracy was in gbm and svm models (`r round(ConMx3$overall['Accuracy'],2)` and `r round(ConMx5$overall['Accuracy'],2)`). Lowest accuracy was in lda (`r round(ConMx4$overall['Accuracy'],2)`) and rpart (`r round(ConMx2$overall['Accuracy'],2)`)
+# Conclusions 
+In out of sample error the RF model demonstrates the highest accuracy (`r round(ConMx$overall['Accuracy'],2)`). Also high accuracy was in gbm and svm models (`r round(ConMx3$overall['Accuracy'],2)` and `r round(ConMx5$overall['Accuracy'],2)`). Lowest accuracy was in lda (`r round(ConMx4$overall['Accuracy'],2)`) and rpart (`r round(ConMx2$overall['Accuracy'],2)`)
 
 
 # Final test predictions
